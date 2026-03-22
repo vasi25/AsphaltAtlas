@@ -118,6 +118,8 @@ export default function RouteDetailPage() {
   const [favLoading, setFavLoading] = useState(false)
 
   // Review form state
+  const [activeTab, setActiveTab] = useState<'reviews' | 'questions'>('reviews')
+
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
   const [reviewSubmitting, setReviewSubmitting] = useState(false)
@@ -400,101 +402,149 @@ export default function RouteDetailPage() {
               </section>
             )}
 
-            {/* Reviews */}
+            {/* Tabbed: Reviews / Questions */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Reviews</h2>
-
-              {/* Review form */}
-              {user && !myReview && (
-                <form onSubmit={submitReview} className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Write a review</h3>
-
-                  {/* Star picker */}
-                  <div className="flex gap-1 mb-3">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setReviewRating(star)}
-                        className={`text-2xl transition-colors ${
-                          star <= reviewRating ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'
-                        }`}
-                      >
-                        ★
-                      </button>
-                    ))}
-                  </div>
-
-                  <textarea
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="Share your experience (optional)"
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-                  />
-
-                  {reviewError && (
-                    <p className="mt-2 text-sm text-red-600">{reviewError}</p>
-                  )}
-
+              {/* Tab bar */}
+              <div className="flex border-b border-gray-200 mb-6">
+                {(['reviews', 'questions'] as const).map((tab) => (
                   <button
-                    type="submit"
-                    disabled={reviewRating === 0 || reviewSubmitting}
-                    className="mt-3 px-5 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors capitalize ${
+                      activeTab === tab
+                        ? 'border-brand-600 text-brand-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
                   >
-                    {reviewSubmitting ? 'Submitting…' : 'Submit review'}
+                    {tab === 'reviews'
+                      ? `Reviews (${reviews.length})`
+                      : `Questions`}
                   </button>
-                </form>
-              )}
+                ))}
+              </div>
 
-              {/* Review list */}
-              {reviews.length === 0 ? (
-                <p className="text-gray-400 text-sm">No reviews yet. Be the first!</p>
-              ) : (
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <div
-                      key={review.id}
-                      className="bg-white border border-gray-200 rounded-xl p-5"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <AvatarInitial
-                            username={review.profiles?.username ?? '?'}
-                            avatarUrl={review.profiles?.avatar_url ?? null}
-                          />
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">
-                              {review.profiles?.username ?? 'Unknown'}
-                            </p>
-                            <p className="text-xs text-gray-400">{formatDate(review.created_at)}</p>
+              {/* Reviews tab */}
+              {activeTab === 'reviews' && (
+                <div>
+                  {/* Rating breakdown */}
+                  {reviews.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+                      <div className="flex items-center gap-6">
+                        {/* Big average */}
+                        <div className="text-center flex-shrink-0">
+                          <div className="text-5xl font-bold text-gray-900">
+                            {displayAvgRating.toFixed(1)}
                           </div>
+                          <StarRating rating={displayAvgRating} size="md" />
+                          <div className="text-xs text-gray-400 mt-1">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <StarRating rating={review.rating} size="sm" />
-                          {user && review.user_id === user.id && (
-                            <button
-                              onClick={() => deleteReview(review.id)}
-                              className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                              title="Delete review"
-                            >
-                              Delete
-                            </button>
-                          )}
+
+                        {/* Bar breakdown */}
+                        <div className="flex-1 space-y-1.5">
+                          {[5, 4, 3, 2, 1].map((star) => {
+                            const count = reviews.filter(r => r.rating === star).length
+                            const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
+                            return (
+                              <div key={star} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 w-3">{star}</span>
+                                <span className="text-yellow-400 text-xs">★</span>
+                                <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="h-full bg-yellow-400 rounded-full transition-all"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-400 w-4 text-right">{count}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
-                      {review.comment && (
-                        <p className="mt-3 text-sm text-gray-600 leading-relaxed">{review.comment}</p>
-                      )}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Review form */}
+                  {user && !myReview && (
+                    <form onSubmit={submitReview} className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Write a review</h3>
+                      <div className="flex gap-1 mb-3">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className={`text-2xl transition-colors ${
+                              star <= reviewRating ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        placeholder="Share your experience (optional)"
+                        rows={3}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                      />
+                      {reviewError && <p className="mt-2 text-sm text-red-600">{reviewError}</p>}
+                      <button
+                        type="submit"
+                        disabled={reviewRating === 0 || reviewSubmitting}
+                        className="mt-3 px-5 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {reviewSubmitting ? 'Submitting…' : 'Submit review'}
+                      </button>
+                    </form>
+                  )}
+
+                  {reviews.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No reviews yet. Be the first!</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {reviews.map((review) => (
+                        <div key={review.id} className="bg-white border border-gray-200 rounded-xl p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <AvatarInitial
+                                username={review.profiles?.username ?? '?'}
+                                avatarUrl={review.profiles?.avatar_url ?? null}
+                              />
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {review.profiles?.username ?? 'Unknown'}
+                                </p>
+                                <p className="text-xs text-gray-400">{formatDate(review.created_at)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StarRating rating={review.rating} size="sm" />
+                              {user && review.user_id === user.id && (
+                                <button
+                                  onClick={() => deleteReview(review.id)}
+                                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {review.comment && (
+                            <p className="mt-3 text-sm text-gray-600 leading-relaxed">{review.comment}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </section>
 
-            <div className="mt-8">
-              <QASection routeId={id!} />
-            </div>
+              {/* Questions tab */}
+              {activeTab === 'questions' && (
+                <QASection routeId={id!} />
+              )}
+            </section>
           </div>
 
           {/* ── RIGHT ──────────────────────────────────────────────────────── */}
