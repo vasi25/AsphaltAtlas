@@ -331,7 +331,7 @@ export default function RouteDetailPage() {
   }
 
   const coverPhoto = route.photos.find((p) => p.is_cover) ?? route.photos[0] ?? null
-  const galleryPhotos = route.photos.filter((p) => !p.is_cover).sort((a, b) => a.order_index - b.order_index)
+  const galleryPhotos = route.photos.slice().sort((a, b) => (b.is_cover ? 1 : 0) - (a.is_cover ? 1 : 0) || a.order_index - b.order_index)
 
   const location = [route.regions?.name, route.countries?.name].filter(Boolean).join(', ')
   const categories = route.route_categories.map((rc) => rc.categories?.name).filter(Boolean)
