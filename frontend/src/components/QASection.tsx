@@ -26,16 +26,25 @@ interface Question {
 
 interface Props {
   routeId: string
+  routeAuthorId: string
+  onCountChange?: (count: number) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function Avatar({ username, size = 'sm' }: { username?: string | null; size?: 'sm' | 'md' }) {
-  const sz = size === 'md' ? 'w-9 h-9 text-sm' : 'w-7 h-7 text-xs'
+function Avatar({ username }: { username?: string | null }) {
   return (
-    <div className={`${sz} rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold flex-shrink-0`}>
+    <div className="w-7 h-7 text-xs rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold flex-shrink-0">
       {username?.[0]?.toUpperCase() ?? '?'}
     </div>
+  )
+}
+
+function AuthorBadge() {
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-600 text-white leading-none">
+      Author
+    </span>
   )
 }
 
@@ -45,7 +54,7 @@ function formatDate(d: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QASection({ routeId }: Props) {
+export default function QASection({ routeId, routeAuthorId, onCountChange }: Props) {
   const { user } = useAuth()
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -72,11 +81,11 @@ export default function QASection({ routeId }: Props) {
       .eq('route_id', routeId)
       .order('created_at', { ascending: true })
 
-    if (error) {
-      console.error('Failed to fetch questions:', error)
-      return
-    }
-    if (data) setQuestions(data as unknown as Question[])
+    if (error) { console.error('Failed to fetch questions:', error); return }
+
+    const list = (data ?? []) as unknown as Question[]
+    setQuestions(list)
+    onCountChange?.(list.length)
   }
 
   useEffect(() => {
@@ -97,11 +106,7 @@ export default function QASection({ routeId }: Props) {
       body: questionText.trim(),
     })
 
-    if (error) {
-      console.error('Failed to post question:', error)
-      setSubmittingQuestion(false)
-      return
-    }
+    if (error) { console.error('Failed to post question:', error); setSubmittingQuestion(false); return }
 
     setQuestionText('')
     await fetchQuestions()
@@ -122,11 +127,7 @@ export default function QASection({ routeId }: Props) {
       body,
     })
 
-    if (error) {
-      console.error('Failed to post answer:', error)
-      setSubmittingAnswer(false)
-      return
-    }
+    if (error) { console.error('Failed to post answer:', error); setSubmittingAnswer(false); return }
 
     setAnswerTexts((prev) => ({ ...prev, [questionId]: '' }))
     setAnsweringId(null)
@@ -138,15 +139,8 @@ export default function QASection({ routeId }: Props) {
 
   async function deleteQuestion(questionId: string) {
     if (!user) return
-    const { error } = await supabase
-      .from('questions')
-      .delete()
-      .eq('id', questionId)
-      .eq('user_id', user.id)
-    if (error) {
-      console.error('Failed to delete question:', error)
-      return
-    }
+    const { error } = await supabase.from('questions').delete().eq('id', questionId).eq('user_id', user.id)
+    if (error) { console.error('Failed to delete question:', error); return }
     await fetchQuestions()
   }
 
@@ -154,30 +148,15 @@ export default function QASection({ routeId }: Props) {
 
   async function deleteAnswer(answerId: string) {
     if (!user) return
-    const { error } = await supabase
-      .from('question_answers')
-      .delete()
-      .eq('id', answerId)
-      .eq('user_id', user.id)
-    if (error) {
-      console.error('Failed to delete answer:', error)
-      return
-    }
+    const { error } = await supabase.from('question_answers').delete().eq('id', answerId).eq('user_id', user.id)
+    if (error) { console.error('Failed to delete answer:', error); return }
     await fetchQuestions()
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <section>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Questions &amp; Answers</h2>
-        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
-          {questions.length}
-        </span>
-      </div>
-
+    <div>
       {/* Ask a question form */}
       {user ? (
         <form onSubmit={submitQuestion} className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
@@ -217,11 +196,14 @@ export default function QASection({ routeId }: Props) {
               {/* Question header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <Avatar username={question.profiles?.username} size="md" />
+                  <Avatar username={question.profiles?.username} />
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      {question.profiles?.username ?? 'Unknown'}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {question.profiles?.username ?? 'Unknown'}
+                      </span>
+                      {question.user_id === routeAuthorId && <AuthorBadge />}
+                    </div>
                     <p className="text-xs text-gray-400">{formatDate(question.created_at)}</p>
                   </div>
                 </div>
@@ -229,7 +211,6 @@ export default function QASection({ routeId }: Props) {
                   <button
                     onClick={() => deleteQuestion(question.id)}
                     className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
-                    title="Delete question"
                   >
                     Delete
                   </button>
@@ -246,20 +227,20 @@ export default function QASection({ routeId }: Props) {
                 ) : (
                   question.question_answers.map((answer) => (
                     <div key={answer.id} className="flex items-start gap-2.5">
-                      <Avatar username={answer.profiles?.username} size="sm" />
+                      <Avatar username={answer.profiles?.username} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <div>
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-gray-800">
                               {answer.profiles?.username ?? 'Unknown'}
                             </span>
-                            <span className="text-xs text-gray-400 ml-2">{formatDate(answer.created_at)}</span>
+                            {answer.user_id === routeAuthorId && <AuthorBadge />}
+                            <span className="text-xs text-gray-400">{formatDate(answer.created_at)}</span>
                           </div>
                           {user && answer.user_id === user.id && (
                             <button
                               onClick={() => deleteAnswer(answer.id)}
                               className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
-                              title="Delete answer"
                             >
                               Delete
                             </button>
@@ -278,9 +259,7 @@ export default function QASection({ routeId }: Props) {
                       <div className="space-y-2">
                         <textarea
                           value={answerTexts[question.id] ?? ''}
-                          onChange={(e) =>
-                            setAnswerTexts((prev) => ({ ...prev, [question.id]: e.target.value }))
-                          }
+                          onChange={(e) => setAnswerTexts((prev) => ({ ...prev, [question.id]: e.target.value }))}
                           placeholder="Write your answer…"
                           rows={2}
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
@@ -316,6 +295,6 @@ export default function QASection({ routeId }: Props) {
           ))}
         </div>
       )}
-    </section>
+    </div>
   )
 }
