@@ -31,7 +31,7 @@ export function useRoutes(filters: Filters) {
         .from('routes')
         .select(`
           *,
-          profiles(username, avatar_url),
+          profiles!routes_user_id_fkey(username, avatar_url),
           countries(name),
           regions(name),
           photos(url, is_cover),
@@ -44,11 +44,17 @@ export function useRoutes(filters: Filters) {
       if (filters.difficulty) query = query.eq('difficulty', filters.difficulty)
       if (filters.surface) query = query.eq('surface', filters.surface)
 
-      const { data } = await query
+      const { data, error } = await query
 
-      if (cancelled || !data) return
+      if (cancelled) return
 
-      let results = data as RouteWithMeta[]
+      if (error) {
+        console.error('useRoutes error:', error)
+        setLoading(false)
+        return
+      }
+
+      let results = (data ?? []) as RouteWithMeta[]
 
       if (filters.categoryId) {
         results = results.filter(r =>
