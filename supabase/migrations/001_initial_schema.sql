@@ -234,10 +234,10 @@ CREATE TRIGGER trg_review_rating
 
 
 -- Auto-create a profile row when a new user signs up via Supabase Auth
-CREATE OR REPLACE FUNCTION handle_new_user()
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO profiles (id, username, full_name, avatar_url)
+    INSERT INTO public.profiles (id, username, full_name, avatar_url)
     VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1)),
@@ -246,7 +246,7 @@ BEGIN
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER trg_on_auth_user_created
     AFTER INSERT ON auth.users
