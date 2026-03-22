@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import CreateRoutePage from './pages/CreateRoutePage'
 
 export default function App() {
   return (
@@ -19,7 +20,7 @@ export default function App() {
 
             {/* Protected routes — add pages here as we build them */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/routes/new" element={<div className="p-8">Create route — coming soon</div>} />
+              <Route path="/routes/new" element={<CreateRoutePage />} />
               <Route path="/profile" element={<div className="p-8">Profile — coming soon</div>} />
               <Route path="/favourites" element={<div className="p-8">Favourites — coming soon</div>} />
             </Route>
