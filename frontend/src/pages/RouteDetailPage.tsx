@@ -119,6 +119,7 @@ export default function RouteDetailPage() {
 
   // Review form state
   const [activeTab, setActiveTab] = useState<'reviews' | 'questions'>('reviews')
+  const [questionCount, setQuestionCount] = useState(0)
 
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
@@ -188,7 +189,14 @@ export default function RouteDetailPage() {
         .order('created_at', { ascending: false })
       if (reviewsData) setReviews(reviewsData as ReviewRow[])
 
-      // 4 & 5. User-specific data
+      // 4. Question count
+      const { count: qCount } = await supabase
+        .from('questions')
+        .select('id', { count: 'exact', head: true })
+        .eq('route_id', id)
+      setQuestionCount(qCount ?? 0)
+
+      // 5 & 6. User-specific data
       if (user) {
         const [favResult, myReviewResult] = await Promise.all([
           supabase
@@ -418,7 +426,7 @@ export default function RouteDetailPage() {
                   >
                     {tab === 'reviews'
                       ? `Reviews (${reviews.length})`
-                      : `Questions`}
+                      : `Questions (${questionCount})`}
                   </button>
                 ))}
               </div>
