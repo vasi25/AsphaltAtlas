@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CreateRoutePage from './pages/CreateRoutePage'
+import RouteDetailPage from './pages/RouteDetailPage'
 
 export default function App() {
   return (
@@ -26,7 +27,7 @@ export default function App() {
             </Route>
 
             {/* Route detail (public) */}
-            <Route path="/routes/:id" element={<div className="p-8">Route detail — coming soon</div>} />
+            <Route path="/routes/:id" element={<RouteDetailPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
