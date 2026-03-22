@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import StarRating from '../components/StarRating'
 import RouteMapView from '../components/map/RouteMapView'
+import QASection from '../components/QASection'
 import type { Difficulty, Surface } from '../types/database'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -490,6 +491,10 @@ export default function RouteDetailPage() {
                 </div>
               )}
             </section>
+
+            <div className="mt-8">
+              <QASection routeId={id!} />
+            </div>
           </div>
 
           {/* ── RIGHT ──────────────────────────────────────────────────────── */}
