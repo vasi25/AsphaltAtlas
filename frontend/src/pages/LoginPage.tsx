@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import logo from '../assets/logo.png'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export default function LoginPage() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <span className="text-4xl">🛣️</span>
+          <img src={logo} alt="AsphaltAtlas" className="h-16 w-auto mx-auto" />
           <h1 className="mt-4 text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="mt-1 text-sm text-gray-500">Sign in to your AsphaltAtlas account</p>
         </div>

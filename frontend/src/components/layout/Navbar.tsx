@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import logo from '../../assets/logo.png'
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
@@ -23,11 +24,8 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl">🛣️</span>
-            <span className="font-bold text-gray-900 text-lg tracking-tight">
-              Asphalt<span className="text-brand-600">Atlas</span>
-            </span>
+          <Link to="/" className="flex items-center">
+            <img src={logo} alt="AsphaltAtlas" className="h-10 w-auto" />
           </Link>
 
           {/* Desktop nav */}
