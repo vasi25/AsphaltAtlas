@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -28,10 +28,9 @@ function totalDistance(pts: number[][]): number {
   return Math.round(d * 10) / 10
 }
 
-async function fetchRoadRoute(waypoints: number[][]): Promise<number[][] | null> {
-  if (waypoints.length < 2) return null
+async function fetchRoadSegment(from: number[], to: number[]): Promise<number[][] | null> {
   try {
-    const coords = waypoints.map((p) => `${p[0]},${p[1]}`).join(';')
+    const coords = `${from[0]},${from[1]};${to[0]},${to[1]}`
     const res = await fetch(
       `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
     )
@@ -41,6 +40,21 @@ async function fetchRoadRoute(waypoints: number[][]): Promise<number[][] | null>
   } catch {
     return null
   }
+}
+
+// Concatenate per-segment coords into one line; uses straight fallback for null (still computing)
+function buildRouteCoords(waypoints: number[][], segmentCoords: (number[][] | null)[]): number[][] {
+  if (waypoints.length < 2) return waypoints
+  const all: number[][] = []
+  for (let i = 0; i < segmentCoords.length; i++) {
+    const coords = segmentCoords[i] ?? [waypoints[i], waypoints[i + 1]]
+    if (i === 0) {
+      all.push(...coords)
+    } else {
+      all.push(...coords.slice(1)) // skip duplicate junction point
+    }
+  }
+  return all
 }
 
 const OSM_STYLE: maplibregl.StyleSpecification = {
@@ -64,13 +78,21 @@ export default function RouteMapDraw({ onChange }: Props) {
   const markersRef = useRef<maplibregl.Marker[]>([])
 
   const [waypoints, setWaypoints] = useState<number[][]>([])
-  const [routeCoords, setRouteCoords] = useState<number[][]>([])
-  const [mode, setMode] = useState<Mode>('road')
+  // Per-segment mode and computed coords — index i = segment between waypoint[i] and waypoint[i+1]
+  const [segmentModes, setSegmentModes] = useState<Mode[]>([])
+  const [segmentCoords, setSegmentCoords] = useState<(number[][] | null)[]>([])
+
+  const [mode, setMode] = useState<Mode>('road') // mode for the NEXT segment placed
   const [isDrawing, setIsDrawing] = useState(false)
   const [isRouting, setIsRouting] = useState(false)
 
+  // Refs so map callbacks always see current values
   const isDrawingRef = useRef(false)
   isDrawingRef.current = isDrawing
+  const modeRef = useRef<Mode>('road')
+  modeRef.current = mode
+  const waypointsRef = useRef<number[][]>([])
+  waypointsRef.current = waypoints
 
   // ── Init map ──────────────────────────────────────────────────────────────────
 
@@ -100,7 +122,15 @@ export default function RouteMapDraw({ onChange }: Props) {
 
       map.on('click', (e) => {
         if (!isDrawingRef.current) return
-        setWaypoints((prev) => [...prev, [e.lngLat.lng, e.lngLat.lat]])
+        const pt = [e.lngLat.lng, e.lngLat.lat]
+        const current = waypointsRef.current
+        // Add new waypoint
+        setWaypoints([...current, pt])
+        // If there's already at least one point, a new segment is created
+        if (current.length >= 1) {
+          setSegmentModes((sm) => [...sm, modeRef.current])
+          setSegmentCoords((sc) => [...sc, null]) // null = pending computation
+        }
       })
     })
 
@@ -112,52 +142,76 @@ export default function RouteMapDraw({ onChange }: Props) {
     }
   }, [])
 
-  // ── Recompute route whenever waypoints or mode changes ────────────────────────
+  // ── Compute pending segments ──────────────────────────────────────────────────
 
   useEffect(() => {
+    const pendingIndices = segmentCoords
+      .map((c, i) => (c === null ? i : -1))
+      .filter((i) => i !== -1)
+
+    if (pendingIndices.length === 0) return
+
     let cancelled = false
+    setIsRouting(true)
 
-    async function update() {
-      if (waypoints.length < 2) {
-        setRouteCoords(waypoints)
-        onChange(null, 0)
-        return
+    async function compute() {
+      for (const i of pendingIndices) {
+        if (cancelled) break
+        const from = waypoints[i]
+        const to = waypoints[i + 1]
+        if (!from || !to) continue
+
+        let coords: number[][]
+        if (segmentModes[i] === 'straight') {
+          coords = [from, to]
+        } else {
+          const road = await fetchRoadSegment(from, to)
+          if (cancelled) break
+          coords = road ?? [from, to]
+        }
+
+        if (!cancelled) {
+          setSegmentCoords((prev) => {
+            const next = [...prev]
+            next[i] = coords
+            return next
+          })
+        }
       }
-
-      if (mode === 'straight') {
-        setRouteCoords(waypoints)
-        onChange({ type: 'LineString', coordinates: waypoints }, totalDistance(waypoints))
-        return
-      }
-
-      // Road mode
-      setIsRouting(true)
-      const road = await fetchRoadRoute(waypoints)
-      if (cancelled) return
-
-      const coords = road ?? waypoints // fallback to straight lines if OSRM fails
-      setRouteCoords(coords)
-      onChange({ type: 'LineString', coordinates: coords }, totalDistance(coords))
-      setIsRouting(false)
+      if (!cancelled) setIsRouting(false)
     }
 
-    update()
+    compute()
     return () => { cancelled = true }
-  }, [waypoints, mode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [segmentCoords]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sync route line on map ────────────────────────────────────────────────────
+  // ── Sync map line and call onChange ───────────────────────────────────────────
 
   useEffect(() => {
+    if (waypoints.length < 2) {
+      onChange(null, 0)
+      const map = mapRef.current
+      if (map?.isStyleLoaded()) {
+        const src = map.getSource('route') as maplibregl.GeoJSONSource | undefined
+        src?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } })
+      }
+      return
+    }
+
+    const routeCoords = buildRouteCoords(waypoints, segmentCoords)
+
+    // Update map immediately (straight placeholders shown while road routes load)
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-    const src = map.getSource('route') as maplibregl.GeoJSONSource | undefined
-    if (!src) return
-    src.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'LineString', coordinates: routeCoords },
-    })
-  }, [routeCoords])
+    if (map?.isStyleLoaded()) {
+      const src = map.getSource('route') as maplibregl.GeoJSONSource | undefined
+      src?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: routeCoords } })
+    }
+
+    // Only report to parent when all segments are resolved
+    if (segmentCoords.every((c) => c !== null)) {
+      onChange({ type: 'LineString', coordinates: routeCoords }, totalDistance(routeCoords))
+    }
+  }, [segmentCoords, waypoints]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync numbered waypoint markers ───────────────────────────────────────────
 
@@ -187,26 +241,32 @@ export default function RouteMapDraw({ onChange }: Props) {
     })
   }, [waypoints])
 
-  // ── Cursor ───────────────────────────────────────────────────────────────────
+  // ── Cursor ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const canvas = mapRef.current?.getCanvas()
     if (canvas) canvas.style.cursor = isDrawing ? 'crosshair' : ''
   }, [isDrawing])
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────────
 
-  const undo = () => setWaypoints((p) => p.slice(0, -1))
+  const undo = () => {
+    setWaypoints((p) => p.slice(0, -1))
+    setSegmentModes((p) => p.slice(0, -1))
+    setSegmentCoords((p) => p.slice(0, -1))
+  }
 
-  const clear = useCallback(() => {
+  const clear = () => {
     setWaypoints([])
-    setRouteCoords([])
+    setSegmentModes([])
+    setSegmentCoords([])
     onChange(null, 0)
-  }, [onChange])
+  }
 
-  const dist = totalDistance(routeCoords)
+  const routeCoords = buildRouteCoords(waypoints, segmentCoords)
+  const dist = waypoints.length < 2 ? 0 : totalDistance(routeCoords)
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full rounded-xl overflow-hidden border border-gray-200">
@@ -245,9 +305,9 @@ export default function RouteMapDraw({ onChange }: Props) {
         )}
       </div>
 
-      {/* Row 2: mode toggle */}
+      {/* Row 2: mode toggle — applies to the NEXT segment only */}
       <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <span className="text-xs text-gray-500 font-medium">Connect via:</span>
+        <span className="text-xs text-gray-500 font-medium">Next segment:</span>
         <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs font-medium">
           <button
             type="button"
@@ -269,7 +329,7 @@ export default function RouteMapDraw({ onChange }: Props) {
           </button>
         </div>
         <span className="text-xs text-gray-400">
-          {mode === 'road' ? 'Follows real roads · good for paved & gravel routes' : 'Direct connection · good for offroad, desert or unmapped tracks'}
+          {mode === 'road' ? 'Next segment follows roads' : 'Next segment is a straight line'}
         </span>
       </div>
 

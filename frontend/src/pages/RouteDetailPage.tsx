@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import StarRating from '../components/StarRating'
 import RouteMapView from '../components/map/RouteMapView'
 import QASection from '../components/QASection'
+import Lightbox from '../components/Lightbox'
 import type { Difficulty, Surface } from '../types/database'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -128,6 +129,9 @@ export default function RouteDetailPage() {
 
   // Display avg rating (can be updated after review submission)
   const [displayAvgRating, setDisplayAvgRating] = useState(0)
+
+  // Lightbox
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   // ── Fetch all data ───────────────────────────────────────────────────────────
 
@@ -379,13 +383,11 @@ export default function RouteDetailPage() {
               <section>
                 <h2 className="text-lg font-semibold text-gray-800 mb-3">Photos</h2>
                 <div className="flex gap-3 overflow-x-auto pb-2">
-                  {galleryPhotos.map((photo) => (
-                    <a
+                  {galleryPhotos.map((photo, i) => (
+                    <button
                       key={photo.id}
-                      href={photo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0 group"
+                      onClick={() => setLightboxIndex(i)}
+                      className="flex-shrink-0 group text-left"
                     >
                       <div className="w-48 h-32 rounded-lg overflow-hidden border border-gray-200 group-hover:border-brand-400 transition-colors">
                         <img
@@ -397,7 +399,7 @@ export default function RouteDetailPage() {
                       {photo.caption && (
                         <p className="mt-1 text-xs text-gray-400 w-48 truncate">{photo.caption}</p>
                       )}
-                    </a>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -507,18 +509,18 @@ export default function RouteDetailPage() {
                       {reviews.map((review) => (
                         <div key={review.id} className="bg-white border border-gray-200 rounded-xl p-5">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3">
+                            <Link to={`/users/${review.user_id}`} className="flex items-center gap-3 group">
                               <AvatarInitial
                                 username={review.profiles?.username ?? '?'}
                                 avatarUrl={review.profiles?.avatar_url ?? null}
                               />
                               <div>
-                                <p className="text-sm font-semibold text-gray-800">
+                                <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-600 transition-colors">
                                   {review.profiles?.username ?? 'Unknown'}
                                 </p>
                                 <p className="text-xs text-gray-400">{formatDate(review.created_at)}</p>
                               </div>
-                            </div>
+                            </Link>
                             <div className="flex items-center gap-2">
                               <StarRating rating={review.rating} size="sm" />
                               {user && review.user_id === user.id && (
@@ -662,6 +664,15 @@ export default function RouteDetailPage() {
           </div>
         </div>
       </div>
+
+      {lightboxIndex !== null && (
+        <Lightbox
+          photos={galleryPhotos.map((p) => ({ id: p.id, url: p.url, caption: p.caption }))}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
+      )}
     </div>
   )
 }

@@ -32,7 +32,10 @@ interface Props {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function Avatar({ username }: { username?: string | null }) {
+function Avatar({ username, avatarUrl }: { username?: string | null; avatarUrl?: string | null }) {
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt={username ?? ''} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+  }
   return (
     <div className="w-7 h-7 text-xs rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold flex-shrink-0">
       {username?.[0]?.toUpperCase() ?? '?'}
@@ -195,18 +198,18 @@ export default function QASection({ routeId, routeAuthorId, onCountChange }: Pro
             <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5">
               {/* Question header */}
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <Avatar username={question.profiles?.username} />
+                <Link to={`/users/${question.user_id}`} className="flex items-center gap-2.5 group">
+                  <Avatar username={question.profiles?.username} avatarUrl={question.profiles?.avatar_url} />
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-gray-800 group-hover:text-brand-600 transition-colors">
                         {question.profiles?.username ?? 'Unknown'}
                       </span>
                       {question.user_id === routeAuthorId && <AuthorBadge />}
                     </div>
                     <p className="text-xs text-gray-400">{formatDate(question.created_at)}</p>
                   </div>
-                </div>
+                </Link>
                 {user && question.user_id === user.id && (
                   <button
                     onClick={() => deleteQuestion(question.id)}
@@ -227,13 +230,13 @@ export default function QASection({ routeId, routeAuthorId, onCountChange }: Pro
                 ) : (
                   question.question_answers.map((answer) => (
                     <div key={answer.id} className="flex items-start gap-2.5">
-                      <Avatar username={answer.profiles?.username} />
+                      <Avatar username={answer.profiles?.username} avatarUrl={answer.profiles?.avatar_url} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-gray-800">
+                            <Link to={`/users/${answer.user_id}`} className="text-xs font-semibold text-gray-800 hover:text-brand-600 transition-colors">
                               {answer.profiles?.username ?? 'Unknown'}
-                            </span>
+                            </Link>
                             {answer.user_id === routeAuthorId && <AuthorBadge />}
                             <span className="text-xs text-gray-400">{formatDate(answer.created_at)}</span>
                           </div>

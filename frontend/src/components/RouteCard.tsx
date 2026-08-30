@@ -81,9 +81,17 @@ export default function RouteCard({ route }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-bold">
-              {route.profiles?.username?.[0]?.toUpperCase()}
-            </div>
+            {route.profiles?.avatar_url ? (
+              <img
+                src={route.profiles.avatar_url}
+                alt={route.profiles.username}
+                className="w-6 h-6 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-bold">
+                {route.profiles?.username?.[0]?.toUpperCase()}
+              </div>
+            )}
             <span className="text-xs text-gray-500">{route.profiles?.username}</span>
           </div>
 

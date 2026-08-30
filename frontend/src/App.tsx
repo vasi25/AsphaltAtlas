@@ -7,6 +7,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import CreateRoutePage from './pages/CreateRoutePage'
 import RouteDetailPage from './pages/RouteDetailPage'
+import ProfilePage from './pages/ProfilePage'
+import PublicProfilePage from './pages/PublicProfilePage'
 
 export default function App() {
   return (
@@ -22,12 +24,13 @@ export default function App() {
             {/* Protected routes — add pages here as we build them */}
             <Route element={<ProtectedRoute />}>
               <Route path="/routes/new" element={<CreateRoutePage />} />
-              <Route path="/profile" element={<div className="p-8">Profile — coming soon</div>} />
-              <Route path="/favourites" element={<div className="p-8">Favourites — coming soon</div>} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
             {/* Route detail (public) */}
             <Route path="/routes/:id" element={<RouteDetailPage />} />
+            {/* Public user profiles */}
+            <Route path="/users/:id" element={<PublicProfilePage />} />
           </Route>
         </Routes>
       </BrowserRouter>
