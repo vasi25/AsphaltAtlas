@@ -10,12 +10,14 @@ export interface UserProfile {
   car_photo_url: string | null
   location_country_code: string | null
   location_city: string | null
+  role: 'user' | 'admin'
 }
 
 interface AuthContextType {
   session: Session | null
   user: User | null
   profile: UserProfile | null
+  isAdmin: boolean
   loading: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -31,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, car_model, car_photo_url, location_country_code, location_city')
+      .select('id, username, avatar_url, car_model, car_photo_url, location_country_code, location_city, role')
       .eq('id', userId)
       .single()
     if (data) setProfile(data as UserProfile)
@@ -69,7 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, profile, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider
+      value={{ session, user: session?.user ?? null, profile, isAdmin: profile?.role === 'admin', loading, signOut, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
   )

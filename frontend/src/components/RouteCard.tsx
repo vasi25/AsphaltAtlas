@@ -11,9 +11,10 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 interface Props {
   route: RouteWithMeta
+  footer?: React.ReactNode
 }
 
-export default function RouteCard({ route }: Props) {
+export default function RouteCard({ route, footer }: Props) {
   const cover = route.photos.find(p => p.is_cover) ?? route.photos[0]
   const location = [route.regions?.name, route.countries?.name].filter(Boolean).join(', ')
 
@@ -100,6 +101,21 @@ export default function RouteCard({ route }: Props) {
             <span className="text-xs text-gray-400">({route.review_count})</span>
           </div>
         </div>
+
+        {route.moderation_status === 'pending' && (
+          <span className="mt-3 inline-block w-fit text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">
+            🕒 Pending review
+          </span>
+        )}
+
+        {footer && (
+          <div
+            className="mt-3 pt-3 border-t border-gray-100"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </Link>
   )

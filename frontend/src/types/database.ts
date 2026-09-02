@@ -2,6 +2,15 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type Difficulty = 'easy' | 'moderate' | 'hard' | 'extreme'
 export type Surface = 'paved' | 'gravel' | 'dirt' | 'mixed'
+export type Role = 'user' | 'admin'
+export type ModerationStatus = 'pending' | 'approved'
+export type ReportStatus = 'open' | 'dismissed'
+
+export interface AIOverviewVerdict {
+  flagged: boolean
+  issues: { category: string; detail: string }[]
+  summary: string
+}
 
 export interface Database {
   public: {
@@ -13,6 +22,7 @@ export interface Database {
           full_name: string | null
           avatar_url: string | null
           bio: string | null
+          role: Role
           created_at: string
           updated_at: string
         }
@@ -92,6 +102,9 @@ export interface Database {
           surface: Surface | null
           tips: string | null
           is_published: boolean
+          moderation_status: ModerationStatus
+          ai_overview: AIOverviewVerdict | null
+          ai_overview_checked_at: string | null
           avg_rating: number
           review_count: number
           created_at: string
@@ -109,6 +122,7 @@ export interface Database {
           surface?: Surface | null
           tips?: string | null
           is_published?: boolean
+          moderation_status?: ModerationStatus
         }
         Update: {
           title?: string
@@ -121,6 +135,7 @@ export interface Database {
           surface?: Surface | null
           tips?: string | null
           is_published?: boolean
+          moderation_status?: ModerationStatus
         }
       }
       route_geometry: {
@@ -210,6 +225,24 @@ export interface Database {
         }
         Update: Record<string, never>
       }
+      reports: {
+        Row: {
+          id: string
+          route_id: string
+          user_id: string
+          reason: string
+          status: ReportStatus
+          created_at: string
+        }
+        Insert: {
+          route_id: string
+          user_id: string
+          reason: string
+        }
+        Update: {
+          status?: ReportStatus
+        }
+      }
     }
   }
 }
@@ -224,3 +257,4 @@ export type RouteGeometry = Database['public']['Tables']['route_geometry']['Row'
 export type Photo = Database['public']['Tables']['photos']['Row']
 export type Review = Database['public']['Tables']['reviews']['Row']
 export type Favourite = Database['public']['Tables']['favourites']['Row']
+export type Report = Database['public']['Tables']['reports']['Row']

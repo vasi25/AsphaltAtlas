@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -9,6 +10,7 @@ import CreateRoutePage from './pages/CreateRoutePage'
 import RouteDetailPage from './pages/RouteDetailPage'
 import ProfilePage from './pages/ProfilePage'
 import PublicProfilePage from './pages/PublicProfilePage'
+import AdminPanelPage from './pages/AdminPanelPage'
 
 export default function App() {
   return (
@@ -24,7 +26,12 @@ export default function App() {
             {/* Protected routes — add pages here as we build them */}
             <Route element={<ProtectedRoute />}>
               <Route path="/routes/new" element={<CreateRoutePage />} />
+              <Route path="/routes/:id/edit" element={<CreateRoutePage />} />
               <Route path="/profile" element={<ProfilePage />} />
+
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<AdminPanelPage />} />
+              </Route>
             </Route>
 
             {/* Route detail (public) */}

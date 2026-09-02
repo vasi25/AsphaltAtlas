@@ -6,7 +6,9 @@ import StarRating from '../components/StarRating'
 import RouteMapView from '../components/map/RouteMapView'
 import QASection from '../components/QASection'
 import Lightbox from '../components/Lightbox'
-import type { Difficulty, Surface } from '../types/database'
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import ReportRouteModal from '../components/ReportRouteModal'
+import type { Difficulty, ModerationStatus, Surface } from '../types/database'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,7 @@ interface RouteDetail {
   difficulty: Difficulty | null
   surface: Surface | null
   tips: string | null
+  moderation_status: ModerationStatus
   avg_rating: number
   review_count: number
   created_at: string
@@ -106,7 +109,7 @@ function Skeleton() {
 
 export default function RouteDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   const [route, setRoute] = useState<RouteDetail | null>(null)
@@ -117,6 +120,17 @@ export default function RouteDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [favLoading, setFavLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+  // Moderation (pending review)
+  const [moderating, setModerating] = useState(false)
+  const [showRejectModal, setShowRejectModal] = useState(false)
+
+  // Report
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [alreadyReported, setAlreadyReported] = useState(false)
+  const [reportSubmitting, setReportSubmitting] = useState(false)
 
   // Review form state
   const [activeTab, setActiveTab] = useState<'reviews' | 'questions'>('reviews')
@@ -195,7 +209,7 @@ export default function RouteDetailPage() {
 
       // 4 & 5. User-specific data
       if (user) {
-        const [favResult, myReviewResult] = await Promise.all([
+        const [favResult, myReviewResult, reportResult] = await Promise.all([
           supabase
             .from('favourites')
             .select('route_id')
@@ -208,9 +222,16 @@ export default function RouteDetailPage() {
             .eq('route_id', id)
             .eq('user_id', user.id)
             .maybeSingle(),
+          supabase
+            .from('reports')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('route_id', id)
+            .maybeSingle(),
         ])
         setIsFavourited(!!favResult.data)
         if (myReviewResult.data) setMyReview(myReviewResult.data as ReviewRow)
+        setAlreadyReported(!!reportResult.data)
       }
 
       setLoading(false)
@@ -251,6 +272,64 @@ export default function RouteDetailPage() {
     } finally {
       setFavLoading(false)
     }
+  }
+
+  // ── Delete route ──────────────────────────────────────────────────────────────
+
+  async function deleteRoute() {
+    if (!id) return
+    setDeleting(true)
+    const { error } = await supabase.from('routes').delete().eq('id', id)
+    if (error) {
+      setDeleting(false)
+      window.alert(`Failed to delete route: ${error.message}`)
+      return
+    }
+    navigate('/')
+  }
+
+  // ── Moderate pending route ───────────────────────────────────────────────────
+
+  async function acceptRoute() {
+    if (!id) return
+    setModerating(true)
+    const { error } = await supabase
+      .from('routes')
+      .update({ moderation_status: 'approved', is_published: true })
+      .eq('id', id)
+    setModerating(false)
+    if (error) {
+      window.alert(`Failed to accept route: ${error.message}`)
+      return
+    }
+    setRoute((prev) => (prev ? { ...prev, moderation_status: 'approved' } : prev))
+  }
+
+  async function rejectPendingRoute() {
+    if (!id) return
+    setModerating(true)
+    const { error } = await supabase.from('routes').delete().eq('id', id)
+    if (error) {
+      setModerating(false)
+      window.alert(`Failed to reject route: ${error.message}`)
+      return
+    }
+    navigate('/admin')
+  }
+
+  // ── Report route ──────────────────────────────────────────────────────────────
+
+  async function submitReport(reason: string) {
+    if (!user || !id || !reason) return
+    setReportSubmitting(true)
+    const { error } = await supabase.from('reports').insert({ route_id: id, user_id: user.id, reason })
+    setReportSubmitting(false)
+    if (error) {
+      window.alert(`Failed to submit report: ${error.message}`)
+      return
+    }
+    setAlreadyReported(true)
+    setShowReportModal(false)
   }
 
   // ── Submit review ────────────────────────────────────────────────────────────
@@ -355,6 +434,15 @@ export default function RouteDetailPage() {
           {location && <p className="mt-1 text-white/80 text-sm">{location}</p>}
         </div>
       </div>
+
+      {/* Moderation status banner (owner / admin only — matches the RLS visibility rules) */}
+      {route.moderation_status === 'pending' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className="rounded-xl px-4 py-3 text-sm font-medium bg-yellow-50 border border-yellow-200 text-yellow-800">
+            🕒 This route is pending review and is only visible to you and admins until it's approved.
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -648,19 +736,70 @@ export default function RouteDetailPage() {
               </div>
             )}
 
-            {/* Favourite button */}
-            <button
-              onClick={toggleFavourite}
-              disabled={favLoading}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-colors disabled:opacity-60 ${
-                isFavourited
-                  ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <span className="text-lg">{isFavourited ? '♥' : '♡'}</span>
-              {isFavourited ? 'Saved to favourites' : 'Add to favourites'}
-            </button>
+            {/* Accept / Reject pending route (admin only) */}
+            {isAdmin && route.moderation_status === 'pending' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={acceptRoute}
+                  disabled={moderating}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
+                >
+                  ✓ Accept
+                </button>
+                <button
+                  onClick={() => setShowRejectModal(true)}
+                  disabled={moderating}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 transition-colors"
+                >
+                  ✕ Reject
+                </button>
+              </div>
+            )}
+
+            {/* Favourite button (not while pending review) */}
+            {route.moderation_status !== 'pending' && (
+              <button
+                onClick={toggleFavourite}
+                disabled={favLoading}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-colors disabled:opacity-60 ${
+                  isFavourited
+                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="text-lg">{isFavourited ? '♥' : '♡'}</span>
+                {isFavourited ? 'Saved to favourites' : 'Add to favourites'}
+              </button>
+            )}
+
+            {/* Edit / Delete route (owner or admin) */}
+            {user && (user.id === route.user_id || isAdmin) && (
+              <div className="flex gap-3">
+                <Link
+                  to={`/routes/${id}/edit`}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-yellow-400 text-yellow-950 hover:bg-yellow-500 transition-colors"
+                >
+                  {isAdmin && user.id !== route.user_id ? 'Edit route (admin)' : 'Edit route'}
+                </Link>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  {isAdmin && user.id !== route.user_id ? 'Delete route (admin)' : 'Delete route'}
+                </button>
+              </div>
+            )}
+
+            {/* Report route (any logged-in user viewing someone else's route, not while pending review) */}
+            {user && user.id !== route.user_id && route.moderation_status !== 'pending' && (
+              <button
+                onClick={() => setShowReportModal(true)}
+                disabled={alreadyReported}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border border-orange-200 text-orange-600 hover:bg-orange-50 disabled:opacity-60 disabled:hover:bg-white transition-colors"
+              >
+                🚩 {alreadyReported ? 'Reported' : 'Report route'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -671,6 +810,38 @@ export default function RouteDetailPage() {
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
+        />
+      )}
+
+      {showDeleteModal && (
+        <ConfirmDeleteModal
+          title={`Delete "${route.title}"?`}
+          description="This will permanently remove the route and everything attached to it — photos, reviews, and questions. This cannot be undone."
+          confirming={deleting}
+          onConfirm={deleteRoute}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {showReportModal && (
+        <ReportRouteModal
+          routeTitle={route.title}
+          submitting={reportSubmitting}
+          onSubmit={submitReport}
+          onCancel={() => setShowReportModal(false)}
+        />
+      )}
+
+      {showRejectModal && (
+        <ConfirmDeleteModal
+          title={`Reject "${route.title}"?`}
+          description="This will permanently remove the route and everything attached to it — photos, reviews, and questions. This cannot be undone."
+          requireTyped={false}
+          confirmLabel="Reject route"
+          confirmingLabel="Rejecting…"
+          confirming={moderating}
+          onConfirm={rejectPendingRoute}
+          onCancel={() => setShowRejectModal(false)}
         />
       )}
     </div>

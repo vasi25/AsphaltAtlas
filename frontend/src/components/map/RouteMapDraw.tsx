@@ -6,6 +6,7 @@ type Mode = 'road' | 'straight'
 
 interface Props {
   onChange: (geojson: { type: 'LineString'; coordinates: number[][] } | null, distanceKm: number) => void
+  initialGeojson?: { type: 'LineString'; coordinates: number[][] } | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function RouteMapDraw({ onChange }: Props) {
+export default function RouteMapDraw({ onChange, initialGeojson }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
@@ -93,6 +94,34 @@ export default function RouteMapDraw({ onChange }: Props) {
   modeRef.current = mode
   const waypointsRef = useRef<number[][]>([])
   waypointsRef.current = waypoints
+  const initialGeojsonRef = useRef(initialGeojson)
+  initialGeojsonRef.current = initialGeojson
+
+  // ── Existing-route reference layer (edit mode) ─────────────────────────────────
+
+  function applyInitialGeojson() {
+    const map = mapRef.current
+    const geo = initialGeojsonRef.current
+    if (!map?.isStyleLoaded()) return
+    const src = map.getSource('route-existing') as maplibregl.GeoJSONSource | undefined
+    if (!src) return
+
+    if (!geo || geo.coordinates.length < 2) {
+      src.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } })
+      return
+    }
+
+    src.setData({ type: 'Feature', properties: {}, geometry: geo })
+    const bounds = geo.coordinates.reduce(
+      (b, c) => b.extend(c as [number, number]),
+      new maplibregl.LngLatBounds(geo.coordinates[0] as [number, number], geo.coordinates[0] as [number, number])
+    )
+    map.fitBounds(bounds, { padding: 60, duration: 0 })
+  }
+
+  useEffect(() => {
+    applyInitialGeojson()
+  }, [initialGeojson]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Init map ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +138,17 @@ export default function RouteMapDraw({ onChange }: Props) {
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
     map.on('load', () => {
+      map.addSource('route-existing', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
+      })
+      map.addLayer({
+        id: 'route-existing-line',
+        type: 'line',
+        source: 'route-existing',
+        paint: { 'line-color': '#9ca3af', 'line-width': 3, 'line-dasharray': [2, 1.5] },
+      })
+
       map.addSource('route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
@@ -119,6 +159,8 @@ export default function RouteMapDraw({ onChange }: Props) {
         source: 'route',
         paint: { 'line-color': '#16a34a', 'line-width': 4, 'line-opacity': 0.9 },
       })
+
+      applyInitialGeojson()
 
       map.on('click', (e) => {
         if (!isDrawingRef.current) return
@@ -301,7 +343,11 @@ export default function RouteMapDraw({ onChange }: Props) {
         )}
 
         {!isDrawing && waypoints.length === 0 && (
-          <span className="text-xs text-gray-400">Click "Draw Route" then place waypoints on the map</span>
+          <span className="text-xs text-gray-400">
+            {initialGeojson
+              ? 'Existing route shown in gray — draw a new path to replace it, or leave as is'
+              : 'Click "Draw Route" then place waypoints on the map'}
+          </span>
         )}
       </div>
 

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import logo from '../../assets/logo.png'
 
 export default function Navbar() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -42,9 +42,20 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center justify-center gap-6 flex-1">
             <NavLink to="/" end className={linkClass}>Explore</NavLink>
-            <NavLink to="/map" className={linkClass}>Map</NavLink>
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                    isActive ? 'bg-red-700 text-white' : 'bg-red-600 text-white hover:bg-red-700'
+                  }`
+                }
+              >
+                Admin Panel
+              </NavLink>
+            )}
           </nav>
 
           {/* Desktop auth */}
@@ -174,7 +185,9 @@ export default function Navbar() {
         {menuOpen && (
           <div className="md:hidden border-t border-gray-100 py-3 space-y-1">
             <NavLink to="/" end className="block px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setMenuOpen(false)}>Explore</NavLink>
-            <NavLink to="/map" className="block px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setMenuOpen(false)}>Map</NavLink>
+            {isAdmin && (
+              <NavLink to="/admin" className="block px-3 py-2 text-sm font-semibold text-red-600 rounded-lg hover:bg-red-50 transition-colors" onClick={() => setMenuOpen(false)}>Admin Panel</NavLink>
+            )}
             {user ? (
               <>
                 <NavLink to="/routes/new" className="block px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setMenuOpen(false)}>+ Post a Route</NavLink>

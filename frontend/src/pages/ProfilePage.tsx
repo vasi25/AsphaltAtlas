@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import RouteCard from '../components/RouteCard'
 import type { RouteWithMeta } from '../hooks/useRoutes'
+import heroRoad from '../assets/hero-road.jpeg'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -414,7 +415,7 @@ export default function ProfilePage() {
         {activeTab === 'routes' && (
           routesLoading ? <RoutesSkeleton /> :
           myRoutes.length === 0 ? (
-            <EmptyState emoji="🛣️" title="No routes posted yet" description="Share your favourite driving roads with the community." linkTo="/routes/new" linkLabel="Post your first route" />
+            <EmptyState image={heroRoad} title="No routes posted yet" description="Share your favourite driving roads with the community." linkTo="/routes/new" linkLabel="Post your first route" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {myRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
@@ -464,10 +465,14 @@ function RoutesSkeleton() {
   )
 }
 
-function EmptyState({ emoji, title, description, linkTo, linkLabel }: { emoji: string; title: string; description: string; linkTo: string; linkLabel: string }) {
+function EmptyState({ emoji, image, title, description, linkTo, linkLabel }: { emoji?: string; image?: string; title: string; description: string; linkTo: string; linkLabel: string }) {
   return (
     <div className="text-center py-16">
-      <span className="text-5xl">{emoji}</span>
+      {image ? (
+        <img src={image} alt="" className="mx-auto w-20 h-20 rounded-xl object-cover shadow-sm" />
+      ) : (
+        <span className="text-5xl">{emoji}</span>
+      )}
       <h3 className="mt-4 text-lg font-semibold text-gray-700">{title}</h3>
       <p className="mt-1 text-sm text-gray-400">{description}</p>
       <Link to={linkTo} className="mt-5 inline-block px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors">{linkLabel}</Link>

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import photos, routes, users
+from .routers import photos, routes, users, moderation
 
 app = FastAPI(
     title="AsphaltAtlas API",
@@ -11,7 +11,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server — update for production
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],  # Vite dev server — update for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,6 +20,7 @@ app.add_middleware(
 app.include_router(routes.router)
 app.include_router(photos.router)
 app.include_router(users.router)
+app.include_router(moderation.router)
 
 
 @app.get("/health")
